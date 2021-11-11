@@ -172,8 +172,6 @@ def main(unused_argv):
         #     '{"output":"/home/HwHiAiUser/output","task_trace":"on"}')
         sess_config.graph_options.rewrite_options.remapping = RewriterConfig.OFF
         sess_config.graph_options.rewrite_options.memory_optimization = RewriterConfig.OFF
-        custom_op.parameter_map["dynamic_input"].b = True
-        custom_op.parameter_map["dynamic_graph_execute_mode"].s = tf.compat.as_bytes("lazy_recompile")
         tf_image_session = tf.compat.v1.Session(config=sess_config)
       else:
         config = tf.compat.v1.ConfigProto()

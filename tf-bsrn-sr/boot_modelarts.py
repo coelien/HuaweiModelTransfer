@@ -47,10 +47,10 @@ if __name__ == '__main__':
     parser.add_argument("--train_url", type=str, default="./output", help='OBS上的输出路径')
     parser.add_argument("--data_url", type=str, default="./dataset", help='OBS上的数据集路径')
     #parser.add_argument("--modelarts_data_dir", type=str, default="/cache/bsrn-dataset/DIV2K",help='在Modelarts容器上的数据集存放路径')
-    parser.add_argument("--modelarts_data_dir", type=str, default="/cache",
+    parser.add_argument("--modelarts_data_dir", type=str, default="/cache/",
                         help='在Modelarts容器上的数据集存放路径')
     parser.add_argument("--modelarts_result_dir", type=str, default="/cache/result", help='在Modelarts容器上创建训练输出目录')
-    parser.add_argument("--obs_dir", type=str, default="obs://bsrn-test/bsrn", help='OBS上路径')
+    parser.add_argument("--obs_dir", type=str, default="obs://bsrn-test/", help='OBS上路径')
     # parser.add_argument("--dataloader", type=str, default="div2k_loader",help='数据获取器')
     # parser.add_argument("--data_input_path", type=str, default="/cache/bsrn-dataset/DIV2K/DIV2K_train_LR_bicubic",
     #                     help='在Modelarts容器上的输入数据集存放路径')
@@ -75,9 +75,8 @@ if __name__ == '__main__':
         os.makedirs(config.modelarts_result_dir)
 
     #bash_header = os.path.join(code_dir, 'scripts/run_gpu.sh')
-    # bash_header = os.path.join(code_dir, 'scripts/run_npu.sh')
-    # bash_header = os.path.join(code_dir, 'scripts/validate_npu.sh')
-    bash_header = os.path.join(code_dir, 'scripts/run_npu_restore.sh')
+    #bash_header = os.path.join(code_dir, 'scripts/run_npu.sh')
+    bash_header = os.path.join(code_dir, 'scripts/validate.sh')
     arg_url = '%s %s %s %s' % (code_dir, config.modelarts_data_dir, config.modelarts_result_dir, config.obs_dir)
     bash_command = 'bash %s %s' % (bash_header, arg_url)
     print("bash command:", bash_command)

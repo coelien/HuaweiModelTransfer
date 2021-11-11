@@ -41,18 +41,16 @@ obs_url=${4}
 current_time=`date "+%Y-%m-%d-%H-%M-%S"`
 
 python ${code_dir}/train.py \
-        --data_input_path=${data_dir}/dataset/DIV2K/DIV2K_train_LR_bicubic\
-        --data_truth_path=${data_dir}/dataset/DIV2K/DIV2K_train_HR \
+        --data_input_path=${data_dir}/DIV2K_train_LR_bicubic\
+        --data_truth_path=${data_dir}/DIV2K_train_HR \
         --train_path=${result_dir} \
-        --restore_path=${data_dir}/result/model.ckpt-100 \
         --obs_dir=${obs_url} \
         --chip='npu' \
         --platform='modelarts' \
         --model='bsrn' \
         --dataloader='div2k_loader' \
         --batch_size=8 \
-        --max_steps=200 \
-        --global_step=100 \
+        --max_steps=100 \
         --save_freq=50 \
         --scales='4' # 2,3,4 for choosing
 #        --bsrn_clip_norm=${clip_norm}

@@ -44,7 +44,7 @@
 │   ├── scripts									----存放模型训练和验证脚本
 │    	├── run_gpu.sh							----使用gpu
 │    	├── run_npu.sh							----使用npu
-│    	└── validate_npu.sh							----验证模型精度
+│    	└── validate.sh							----验证模型精度
 │   ├── boot_modelarts.py
 │   ├── help_modelarts.py
 │   ├── test_bsrn.py							----测试模型
@@ -98,7 +98,7 @@ bash scripts/test.sh
 命令行切换路径到`tf-bsrn-sr/`，执行以下命令，详细的参数设置请参考脚本中的注释
 
 ```shell
-bash scripts/validate_npu.sh
+bash scripts/validate.sh
 ```
 
 ### NPU训练、推理、评估
