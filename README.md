@@ -172,7 +172,7 @@ GPU Checkpoints: ([百度云链接，提取码：xxxx]()) <font color='red'> 【
 
  GPU性能log截图
 
-![GPU性能](statics\GPU性能.jpg)
+<img src="statics\GPU性能.jpg" alt="NPU性能" style="zoom:67%;" />
 
 |   平台   | BatchSize | 训练性能(sec/batch) |
 | :------: | :-------: | :-----------------: |
