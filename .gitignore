@@ -1,7 +1,6 @@
 *.rar
 *.xlsx
 .idea/
-*.jpg
 MA_LOG/
 results/
 *.pyc
