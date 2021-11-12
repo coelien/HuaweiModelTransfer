@@ -4,3 +4,4 @@
 *.jpg
 MA_LOG/
 results/
+*.pyc
