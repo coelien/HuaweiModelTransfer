@@ -17,7 +17,7 @@
 ### 代码路径解释
 ```shell
 ├── temp										----存放训练结果及数据集文件
-│   ├── result									----存放训练结果（自动生成）
+│   ├── result									----存放训练结果（gpu训练自动生成）
 │   │   ├── model.ckpt							----存放固化的模型pbtxt文件
 │   │   ├── result-pictures						----存放验证数据（运行validate_gpu.sh）自动生成的超分辨率图片
 │   │   │   ├── ensemble
@@ -42,16 +42,19 @@
 │   ├── dataloaders								----数据预处理和加载脚本，可以得到batch-size大小的数据
 │   ├── models									----模型网络定义，保存，恢复及优化相关脚本
 │   ├── scripts									----存放模型训练和验证脚本
-│    	├── run_gpu.sh							----使用gpu
-│    	├── run_npu.sh							----使用npu
-│    	└── validate_npu.sh							----验证模型精度
+│    	├── run_gpu.sh							----使用gpu(v100)
+│    	├── run_npu.sh							----使用npu(modelarts)
+│    	├── run_npu_restore.sh					----从中断点恢复npu训练
+│    	├── test.sh								----推理
+│    	├── validate_gpu.sh						----gpu(v100)上验证模型精度
+│    	└── validate_npu.sh						----npu(modelarts)上验证模型精度
 │   ├── boot_modelarts.py
 │   ├── help_modelarts.py
 │   ├── test_bsrn.py							----测试模型
 │   ├── train.py								----训练模型
-│   ├── output.txt								----训练输出
+│   ├── output.txt								----训练输出(gpu训练自动生成)
 │   └── validate_bsrn.py						----验证模型
-├── statics										----存放图片静态数据（用于md文件）
+├── statics										----存放图片静态数据(用于md文件)
 ├── LICENSE
 ├── README.md
 └── requirments.txt  							---- 依赖配置文件
@@ -120,23 +123,21 @@ NPU Checkpoints: ([百度云链接，提取码：xxxx]()) <font color='red'> 【
 
 GPU Checkpoints: ([百度云链接，提取码：xxxx]()) <font color='red'> 【链接待完善】 </font>
 
-作者论文中提供的各项指标值为：训练以USR_8x数据集为例。
+作者论文中提供的各项指标值为：
 
-|           | PSNR              | SSIM           | UQIM           |
-| --------- | ----------------- | -------------- | -------------- |
-| SRDRM     | 28.36/24.64/21.20 | 0.80/0.68/0.60 | 2.78/2.46/2.18 |
-| SRDRM-GAN | 28.55/24.62/20.25 | 0.81/0.69/0.61 | 2.77/2.48/2.17 |
+|      | PSNR   | SSIM   |
+| ---- | ------ | ------ |
+| BSRN | 27.538 | 0.7341 |
 
-**(Average PSNR, SSIM, and UIQM scores for 2×/4×/8× SISR on USR-248 test set.)**
+**(PSNR, SSIMscores for scale x4 on BSD100 dataset.)**
 
 
-##### USR_8X  <font color='red'> 【srdrm-gan npu指标 待完善】 </font>
+##### *×*4-scale BSRN model <font color='red'> 【bsrn gpu, npu指标 待完善】 </font>
 <table>
     <tr>
        <td>metrics</td>
        <td colspan="2" align="center">PSNR</td>
        <td colspan="2" align="center">SSIM</td>
-       <td colspan="2" align="center">UQIM</td>
     </tr>
     <tr>
       <td>chip</td>
@@ -144,66 +145,39 @@ GPU Checkpoints: ([百度云链接，提取码：xxxx]()) <font color='red'> 【
       <td>npu</td>
       <td>gpu</td>
       <td>npu</td>
-      <td>gpu</td>
-      <td>npu</td>
     </tr>
     <tr>
-      <td>srdrm</td>
-      <td>22.74</td>
-      <td>23.70</td>
-      <td>0.63</td>
-      <td>0.63</td>
-      <td>2.28</td>
-      <td>2.26</td>
-    </tr>
-    <tr>
-      <td>srdrm-gan</td>
-      <td>21.93</td>
+      <td>BSRN</td>
       <td></td>
-      <td>0.58</td>
       <td></td>
-      <td>3.00</td>
+      <td></td>
       <td></td>
     </tr>
 </table>
 
 
 
+
 ### 性能对比
 
-此处只展示srdrm-gan模型在USR_2X数据集上的训练与测试结果。其他的性能数据可参考文件[百度网盘_task_log]()
+展示bsrn模型在DIV2K 数据集上的训练性能
 
 #### 训练性能
 
-###### 1.SRDRM for USR_8x
+###### 1.BSRN
 
  NPU性能log截图
 
-![image-20211013102523123](https://gitee.com/windclub/image_bed/raw/master/img/20211013102523.png)
+<img src="statics\NPU性能.jpg" alt="NPU性能" style="zoom:67%;" />
 
  GPU性能log截图
 
-![image-20211013102301982](https://gitee.com/windclub/image_bed/raw/master/img/20211013102309.png)
+![GPU性能](statics\GPU性能.jpg)
 
-|   平台   | BatchSize | 训练性能(fps) |
-| :------: | :-------: | :-----------: |
-|   NPU    |     2     |      12       |
-| GPU V100 |     2     |       8       |
-
-NPU训练性能约为GPU训练性能的1.5倍。
-
-###### 2.SRDRM-GAN for USR_8x
-
-NPU性能log截图 <font color='red'> 【待完善】 </font>
-
-GPU性能log截图
-
-![image-20211013103121415](https://gitee.com/windclub/image_bed/raw/master/img/20211013103326.png)
-
-|   平台   | BatchSize | 训练性能(fps) |
-| :------: | :-------: | :-----------: |
-|   NPU    |           |               |
-| GPU V100 |     2     |       3       |
+|   平台   | BatchSize | 训练性能(sec/batch) |
+| :------: | :-------: | :-----------------: |
+|   NPU    |     8     |        0.739        |
+| GPU V100 |     8     |        0.828        |
 
 #### 推理性能 <font color='red'> 【待完善】 </font>
 
@@ -229,57 +203,3 @@ npu训练性能（命令行截图）
 | 平台 | BatchSize | 训练性能(fps) |
 | :--: | :-------: | :-----------: |
 | NPU  |           |               |
-
-- 2020-06-20 19:06:09.349677: I tf_adapter/kernels/geop_npu.cc:338] [GEOP] GeOp Finalize start, tf session: direct24135e275a110a29, graph_id_: 1
-
-  2020-06-20 19:06:09.349684: I tf_adapter/kernels/geop_npu.cc:342] tf session: direct24135e275a110a29, graph id: 1
-
-  2020-06-20 19:06:09.397087: I tf_adapter/kernels/geop_npu.cc:347] [GEOP] GE Remove Graph success. tf session: direct24135e275a110a29 , graph id: 1
-
-  2020-06-20 19:06:09.397105: I tf_adapter/kernels/geop_npu.cc:368] [GEOP] GeOp Finalize success, tf session: direct24135e275a110a29, graph_id_: 1
-
-  2020-06-20 19:06:09.398108: I tf_adapter/kernels/geop_npu.cc:338] [GEOP] GeOp Finalize start, tf session: direct24135e275a110a29, graph_id_: 31
-
-  2020-06-20 19:06:09.398122: I tf_adapter/kernels/geop_npu.cc:368] [GEOP] GeOp Finalize success, tf session: direct24135e275a110a29, graph_id_: 31
-
-  2020-06-20 19:06:09.398247: I tf_adapter/kernels/host_queue_dataset_op.cc:71] Start destroy tdt.
-
-  2020-06-20 19:06:09.412269: I tf_adapter/kernels/host_queue_dataset_op.cc:77] Tdt client close success.
-
-  2020-06-20 19:06:09.412288: I tf_adapter/kernels/host_queue_dataset_op.cc:83] dlclose handle finish.
-
-  2020-06-20 19:06:09.412316: I tf_adapter/kernels/geop_npu.cc:338] [GEOP] GeOp Finalize start, tf session: direct24135e275a110a29, graph_id_: 51
-
-  2020-06-20 19:06:09.412323: I tf_adapter/kernels/geop_npu.cc:342] tf session: direct24135e275a110a29, graph id: 51
-
-  2020-06-20 19:06:09.553281: I tf_adapter/kernels/geop_npu.cc:347] [GEOP] GE Remove Graph success. tf session: direct24135e275a110a29 , graph id: 51
-
-  2020-06-20 19:06:09.553299: I tf_adapter/kernels/geop_npu.cc:368] [GEOP] GeOp Finalize success, tf session: direct24135e275a110a29, graph_id_: 51
-
-  2020-06-20 19:06:10.619514: I tf_adapter/kernels/host_queue_dataset_op.cc:172] HostQueueDatasetOp's iterator is released.
-
-  2020-06-20 19:06:10.620037: I tf_adapter/kernels/geop_npu.cc:338] [GEOP] GeOp Finalize start, tf session: direct24135e275a110a29, graph_id_: 41
-
-  2020-06-20 19:06:10.620054: I tf_adapter/kernels/geop_npu.cc:342] tf session: direct24135e275a110a29, graph id: 41
-
-  2020-06-20 19:06:10.621564: I tf_adapter/kernels/geop_npu.cc:347] [GEOP] GE Remove Graph success. tf session: direct24135e275a110a29 , graph id: 41
-
-  2020-06-20 19:06:10.622904: I tf_adapter/util/session_manager.cc:50] find ge session connect with tf session direct24135e275a110a29
-
-  2020-06-20 19:06:10.975070: I tf_adapter/util/session_manager.cc:55] destory ge session connect with tf session direct24135e275a110a29 success.
-
-  2020-06-20 19:06:11.380491: I tf_adapter/kernels/geop_npu.cc:388] [GEOP] Close TsdClient.
-
-  2020-06-20 19:06:11.664666: I tf_adapter/kernels/geop_npu.cc:393] [GEOP] Close TsdClient success.
-
-  2020-06-20 19:06:11.665011: I tf_adapter/kernels/geop_npu.cc:368] [GEOP] GeOp Finalize success, tf session: direct24135e275a110a29, graph_id_: 41 step  epoch  top1    top5     loss   checkpoint_time(UTC)85068    3.0  50.988   76.99    3.09  
-
-  2020-06-20 18:06:0690072    3.0  51.569   77.51    3.03  
-
-  2020-06-20 18:11:1495076    3.0  51.689   77.33    3.00  
-
-  2020-06-20 18:16:22100080    3.0  51.426   77.04    3.08  
-
-  2020-06-20 18:25:11105084    3.0  51.581   77.50    3.03  
-
-  2020-06-20 18:34:23Finished evaluation

@@ -50,7 +50,7 @@ python ${code_dir}/train.py \
         --model='bsrn' \
         --dataloader='div2k_loader' \
         --batch_size=8 \
-        --max_steps=100 \
-        --save_freq=50 \
+        --max_steps=1000000 \
+        --save_freq=10000 \
         --scales='4' # 2,3,4 for choosing
 #       --bsrn_clip_norm=${clip_norm}
