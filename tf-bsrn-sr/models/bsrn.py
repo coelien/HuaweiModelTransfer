@@ -45,7 +45,7 @@ tf.flags.DEFINE_string('bsrn_model_scales', '-1', 'Supported scales of the model
 tf.flags.DEFINE_integer('bsrn_conv_features', 64, 'The number of convolutional features (\'c\' in the paper).')
 tf.flags.DEFINE_integer('bsrn_state_features', 64, 'The number of state features (\'s\' in the paper).')
 tf.flags.DEFINE_integer('bsrn_recursions', 16, 'The number of recursions of the recursive residual block (\'R\' in the paper).')
-tf.flags.DEFINE_integer('bsrn_recursion_frequency', 1, 'The frequency of upscaling features to obtain an ensembled image (\'r\' in the paper).')
+tf.flags.DEFINE_integer('bsrn_recursion_frequency', 16, 'The frequency of upscaling features to obtain an ensembled image (\'r\' in the paper).')
 tf.flags.DEFINE_string('bsrn_rgb_mean', '127.5,127.5,127.5', 'Mean R, G, and B values of the training images (e.g., 127.5,127.5,127.5).')
 
 tf.flags.DEFINE_float('bsrn_learning_rate', 1e-4, 'Initial learning rate.')
@@ -108,17 +108,17 @@ class BSRN(BaseModel):
 
         self.tf_truth = tf.placeholder(tf.float32, [None, None, None, 3])
 
-        if FLAGS.chip == 'npu':
-          sess_config = tf.compat.v1.ConfigProto()
-          custom_op = sess_config.graph_options.rewrite_options.custom_optimizers.add()
-          custom_op.name = "NpuOptimizer"
-          sess_config.graph_options.rewrite_options.remapping = RewriterConfig.OFF
-          sess_config.graph_options.rewrite_options.memory_optimization = RewriterConfig.OFF
-          # custom_op.parameter_map['dynamic_input'].b = True
-          # custom_op.parameter_map["dynamic_inputs_shape_range"].s = tf.compat.as_bytes("data:[-1,-1,-1, 3]")
-          custom_op.parameter_map["dynamic_input"].b = True
-          custom_op.parameter_map["dynamic_graph_execute_mode"].s = tf.compat.as_bytes("lazy_recompile")
-          self.tf_session = tf.compat.v1.Session(config=sess_config)
+        # if FLAGS.chip == 'npu':
+        #   sess_config = tf.compat.v1.ConfigProto()
+        #   custom_op = sess_config.graph_options.rewrite_options.custom_optimizers.add()
+        #   custom_op.name = "NpuOptimizer"
+        #   sess_config.graph_options.rewrite_options.remapping = RewriterConfig.OFF
+        #   sess_config.graph_options.rewrite_options.memory_optimization = RewriterConfig.OFF
+        #   custom_op.parameter_map['dynamic_input'].b = True
+        #   custom_op.parameter_map["dynamic_inputs_shape_range"].s = tf.compat.as_bytes("data:[-1,-1,-1, 3]")
+        #   # custom_op.parameter_map["dynamic_input"].b = True
+        #   # custom_op.parameter_map["dynamic_graph_execute_mode"].s = tf.compat.as_bytes("lazy_recompile")
+        #   self.tf_session = tf.compat.v1.Session(config=sess_config)
 
         # Clips tensor values to a specified min and max.
         input_summary = tf.cast(tf.clip_by_value(self.tf_input, 0.0, 255.0), tf.uint8)
@@ -202,8 +202,8 @@ class BSRN(BaseModel):
         sess_config.graph_options.rewrite_options.memory_optimization = RewriterConfig.OFF
         # custom_op.parameter_map['dynamic_input'].b = True
         # custom_op.parameter_map["dynamic_inputs_shape_range"].s = tf.compat.as_bytes("data:[-1,-1,-1, 3]")
-        custom_op.parameter_map["dynamic_input"].b = True
-        custom_op.parameter_map["dynamic_graph_execute_mode"].s = tf.compat.as_bytes("lazy_recompile")
+        # custom_op.parameter_map["dynamic_input"].b = True
+        # custom_op.parameter_map["dynamic_graph_execute_mode"].s = tf.compat.as_bytes("lazy_recompile")
         self.tf_session = tf.compat.v1.Session(config=sess_config)
       else:
         config = tf.compat.v1.ConfigProto()

@@ -161,7 +161,7 @@ def main(unused_argv):
       model.save(base_path=FLAGS.train_path)
       tf.logging.info('saved a model checkpoint at step %d' % (global_train_step))
 
-    if FLAGS.platform.lower() == 'modelarts':
+    if FLAGS.platform.lower() == 'modelarts' and local_train_step % FLAGS.save_freq == 0:
       from help_modelarts import modelarts_result2obs
       modelarts_result2obs(FLAGS)
 
