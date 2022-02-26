@@ -76,9 +76,9 @@ if __name__ == '__main__':
 
     #bash_header = os.path.join(code_dir, 'scripts/run_gpu.sh')
     # bash_header = os.path.join(code_dir, 'scripts/run_npu.sh')
-    # bash_header = os.path.join(code_dir, 'scripts/validate_npu.sh')
+    bash_header = os.path.join(code_dir, 'scripts/validate_npu.sh')
     # bash_header = os.path.join(code_dir, 'scripts/run_npu_restore.sh')
-    bash_header = os.path.join(code_dir, 'scripts/inference.sh')
+    # bash_header = os.path.join(code_dir, 'scripts/inference.sh')
     arg_url = '%s %s %s %s' % (code_dir, config.modelarts_data_dir, config.modelarts_result_dir, config.obs_dir)
     bash_command = 'bash %s %s' % (bash_header, arg_url)
     print("bash command:", bash_command)

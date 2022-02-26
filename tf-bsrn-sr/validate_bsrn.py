@@ -32,6 +32,7 @@ import time
 
 import numpy as np
 import tensorflow as tf
+from scipy.signal import convolve2d
 
 import dataloaders
 import models
@@ -63,6 +64,7 @@ if __name__ == '__main__':
 
   tf.flags.DEFINE_string("chip", "gpu", "Run on which chip, (npu or gpu or cpu)")
   tf.flags.DEFINE_string("platform", "linux", 'the platform this code is running on')
+
 
   # parse data loader and model first and import them
   pre_parser = argparse.ArgumentParser(add_help=False)
@@ -109,8 +111,66 @@ def _image_psnr2(output_image, truth_image):
 def _image_psnr_tf(output_image, truth_image):
   return tf.image.psnr(output_image, truth_image, max_val=255)
 
-def _image_ssim_tf(output_image, truth_image):
-  return tf.image.psnr(output_image, truth_image, max_val=255)
+def matlab_style_gauss2D(shape=(3, 3), sigma=0.5):
+    """
+    2D gaussian mask - should give the same result as MATLAB's
+    fspecial('gaussian',[shape],[sigma])
+    """
+    m, n = [(ss - 1.) / 2. for ss in shape]
+    y, x = np.ogrid[-m:m + 1, -n:n + 1]
+    h = np.exp(-(x * x + y * y) / (2. * sigma * sigma))
+    h[h < np.finfo(h.dtype).eps * h.max()] = 0
+    sumh = h.sum()
+    if sumh != 0:
+      h /= sumh
+    return h
+
+
+def filter2(x, kernel, mode='same'):
+  return convolve2d(x, np.rot90(kernel, 2), mode=mode)
+def _image_ssim_tf2(im1, im2):
+  # ssim = tf.image.ssim(im1,im2,255)
+  im1 = im1.astype(dtype='uint8')
+  # print(type(im1),im1.shape,im1.dtype)
+  im1 = tf.convert_to_tensor(im1)
+  # print(type(im1),im1.shape,im1.dtype)
+  im2 = im2.astype(dtype='uint8')
+  im2 = tf.convert_to_tensor(im2)
+  ssim = tf.image.ssim(im1, im2, 255)
+  with tf.Session():
+    # print(ssim.eval())
+    ssim = ssim.eval()
+  return ssim
+
+def _image_ssim_tf(im1, im2, k1=0.01, k2=0.03, win_size=11, L=255):
+  if not im1.shape == im2.shape:
+    raise ValueError("Input Imagees must have the same dimensions")
+  if len(im1.shape) > 2:
+    raise ValueError("Please input the images with 1 channel")
+
+  M, N = im1.shape
+  C1 = (k1 * L) ** 2
+  C2 = (k2 * L) ** 2
+  window = matlab_style_gauss2D(shape=(win_size, win_size), sigma=1.5)
+  window = window / np.sum(np.sum(window))
+
+  if im1.dtype == np.uint8:
+    im1 = np.double(im1)
+  if im2.dtype == np.uint8:
+    im2 = np.double(im2)
+
+  mu1 = filter2(im1, window, 'valid')
+  mu2 = filter2(im2, window, 'valid')
+  mu1_sq = mu1 * mu1
+  mu2_sq = mu2 * mu2
+  mu1_mu2 = mu1 * mu2
+  sigma1_sq = filter2(im1 * im1, window, 'valid') - mu1_sq
+  sigma2_sq = filter2(im2 * im2, window, 'valid') - mu2_sq
+  sigmal2 = filter2(im1 * im2, window, 'valid') - mu1_mu2
+
+  ssim_map = ((2 * mu1_mu2 + C1) * (2 * sigmal2 + C2)) / ((mu1_sq + mu2_sq + C1) * (sigma1_sq + sigma2_sq + C2))
+
+  return np.mean(np.mean(ssim_map))
 
 def _image_rmse2(output_image, truth_image):
   yr_out = 0.257 * output_image[:, :, 0] + 0.504 * output_image[:, :, 1] + 0.098 * output_image[:, :, 2] + 16.5
@@ -120,7 +180,7 @@ def _image_rmse2(output_image, truth_image):
   return rmse
 
 
-def main(unused_argv):
+def go():
   # initialize
   FLAGS.bsrn_intermediate_outputs = True
   # os.environ['CUDA_VISIBLE_DEVICES'] = FLAGS.cuda_device
@@ -172,8 +232,8 @@ def main(unused_argv):
         #     '{"output":"/home/HwHiAiUser/output","task_trace":"on"}')
         sess_config.graph_options.rewrite_options.remapping = RewriterConfig.OFF
         sess_config.graph_options.rewrite_options.memory_optimization = RewriterConfig.OFF
-        # custom_op.parameter_map["dynamic_input"].b = True
-        # custom_op.parameter_map["dynamic_graph_execute_mode"].s = tf.compat.as_bytes("lazy_recompile")
+        custom_op.parameter_map["dynamic_input"].b = True
+        custom_op.parameter_map["dynamic_graph_execute_mode"].s = tf.compat.as_bytes("lazy_recompile")
         tf_image_session = tf.compat.v1.Session(config=sess_config)
       else:
         config = tf.compat.v1.ConfigProto()
@@ -192,20 +252,20 @@ def main(unused_argv):
   # validate
   num_total_outputs = FLAGS.bsrn_recursions // FLAGS.bsrn_recursion_frequency
   modules_average_psnr_dict = {}
-  modules_average_rmse_dict = {}
+  modules_average_ssim_dict = {}
 
   for scale in scale_list:
     modules_average_psnr_dict[scale] = []
-    modules_average_rmse_dict[scale] = []
+    modules_average_ssim_dict[scale] = []
 
   num_images = dataloader.get_num_images()
 
   for scale in scale_list:
     psnr_list = []
-    rmse_list = []
+    ssim_list = []
     for i in range(num_total_outputs+1):
       psnr_list.append([])
-      rmse_list.append([])
+      ssim_list.append([])
 
     for image_index in range(num_images):
       input_image, truth_image, image_name = dataloader.get_image_pair(image_index=image_index, scale=scale)
@@ -241,13 +301,14 @@ def main(unused_argv):
           truth_image_shaved = _shave_image(truth_image, shave_size=FLAGS.shave_size)
           output_image_shaved = _shave_image(output_image, shave_size=FLAGS.shave_size)
 
-          psnr = _image_psnr(output_image=output_image_shaved, truth_image=truth_image_shaved)
-          rmse = _image_rmse(output_image=output_image_shaved, truth_image=truth_image_shaved)
+          psnr = _image_psnr2(output_image=output_image_shaved, truth_image=truth_image_shaved)
+          # ssim = _image_rmse(im1=output_image_shaved, im2=truth_image_shaved)
+          ssim = _image_rmse(output_image=output_image_shaved, truth_image=truth_image_shaved)
 
-          tf.logging.info('t%d, x%d, %d/%d, psnr=%.2f, rmse=%.2f' % (num_recursions, scale, image_index+1, num_images, psnr, rmse))
+          tf.logging.info('t%d, x%d, %d/%d, psnr=%.2f, ssim=%.2f' % (num_recursions, scale, image_index+1, num_images, psnr, ssim))
 
           psnr_list[i].append(psnr)
-          rmse_list[i].append(rmse)
+          ssim_list[i].append(ssim)
       
       output_image = output_image_ensemble / ensemble_factor_total
 
@@ -263,28 +324,29 @@ def main(unused_argv):
       truth_image_shaved = _shave_image(truth_image, shave_size=FLAGS.shave_size)
       output_image_shaved = _shave_image(output_image, shave_size=FLAGS.shave_size)
 
-      psnr = _image_psnr(output_image=output_image_shaved, truth_image=truth_image_shaved)
-      rmse = _image_rmse(output_image=output_image_shaved, truth_image=truth_image_shaved)
+      psnr = _image_psnr2(output_image=output_image_shaved, truth_image=truth_image_shaved)
+      # ssim = _image_rmse(im1=output_image_shaved, im2=truth_image_shaved)
+      ssim = _image_rmse(output_image=output_image_shaved, truth_image=truth_image_shaved)
 
-      tf.logging.info('ensemble, x%d, %d/%d, psnr=%.2f, rmse=%.2f' % (scale, image_index+1, num_images, psnr, rmse))
+      tf.logging.info('ensemble, x%d, %d/%d, psnr=%.2f, ssim=%.2f' % (scale, image_index+1, num_images, psnr, ssim))
 
       psnr_list[num_total_outputs].append(psnr)
-      rmse_list[num_total_outputs].append(rmse)
+      ssim_list[num_total_outputs].append(ssim)
 
     for i in range(num_total_outputs+1):
       average_psnr = np.mean(psnr_list[i])
       modules_average_psnr_dict[scale].append(average_psnr)
-      average_rmse = np.mean(rmse_list[i])
-      modules_average_rmse_dict[scale].append(average_rmse)
+      average_ssim = np.mean(ssim_list[i])
+      modules_average_ssim_dict[scale].append(average_ssim)
 
 
   # finalize
   tf.logging.info('finished')
   for scale in scale_list:
-    print('- x%d, PSNR and RMSE:' % (scale))
+    print('- x%d, PSNR and SSIM:' % (scale))
     print(','.join([('%.3f' % x) for x in modules_average_psnr_dict[scale]]))
     print('')
-    print(','.join([('%.3f' % x) for x in modules_average_rmse_dict[scale]]))
+    print(','.join([('%.3f' % x) for x in modules_average_ssim_dict[scale]]))
 
   if FLAGS.platform.lower() == 'modelarts':
     from help_modelarts import modelarts_result2obs
@@ -292,4 +354,4 @@ def main(unused_argv):
 
 
 if __name__ == '__main__':
-  tf.app.run()
+  tf.compat.v1.app.run(go())

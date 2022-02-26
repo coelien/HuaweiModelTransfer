@@ -28,14 +28,9 @@
 import argparse
 import importlib
 import os
-import time
 
 import numpy as np
 import tensorflow as tf
-
-import dataloaders
-import models
-
 from tensorflow.core.protobuf.rewriter_config_pb2 import RewriterConfig
 
 DEFAULT_DATALOADER = 'basic_loader'
@@ -132,7 +127,7 @@ def _image_rmse2(output_image, truth_image):
     return rmse
 
 
-def main(unused_argv):
+def go():
     # initialize
     FLAGS.bsrn_intermediate_outputs = True
     # os.environ['CUDA_VISIBLE_DEVICES'] = FLAGS.cuda_device
@@ -167,7 +162,7 @@ def main(unused_argv):
                 config.gpu_options.allow_growth = True
                 # config.gpu_options.per_process_gpu_memory_fraction = 0.3
                 # 设置GPU显存按需增长
-                config.gpu_options.allow_growth = True
+                # config.gpu_options.allow_growth = True
                 tf_image_session = tf.compat.v1.Session(config=config)
 
             elif FLAGS.chip == 'npu':
@@ -201,7 +196,7 @@ def main(unused_argv):
     # model.restore(ckpt_path=FLAGS.restore_path, target=FLAGS.restore_target)
     with tf.Graph().as_default():
         output_graph_def = tf.GraphDef()
-        with open("./frozen_model.pb", "rb") as f:
+        with open("/mnt/data1/2021/hht/huawei/bsrn/frozen_model.pb", "rb") as f:
             output_graph_def.ParseFromString(f.read())
             tf.import_graph_def(output_graph_def, name="")
         with tf.Session() as sess:
@@ -243,6 +238,7 @@ def main(unused_argv):
                     rmse_list.append([])
                     # ssim_list.append([])
 
+                print(num_images)
                 for image_index in range(num_images):
                     input_image, truth_image, image_name = dataloader.get_image_pair(image_index=image_index,
                                                                                      scale=scale)
@@ -253,9 +249,11 @@ def main(unused_argv):
 
                     # print(output_images)
                     print("----------------------------------------------------------")
+                    print("input type:",type(input_image),"shape: ",input_image.shape)
                     print(type(output_images))
                     print(len(output_images))
-
+                    for output_img in output_images:
+                        print(type(output_img), output_img.shape)
                     output_image_ensemble = np.zeros_like(output_images[0][0])
                     ensemble_factor_total = 0.0
 
@@ -346,4 +344,4 @@ def main(unused_argv):
 
 
 if __name__ == '__main__':
-    tf.app.run()
+    tf.app.run(go())

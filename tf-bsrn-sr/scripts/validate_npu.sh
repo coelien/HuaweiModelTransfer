@@ -23,7 +23,7 @@ python ${code_dir}/validate_bsrn.py \
         --dataloader=basic_loader \
         --data_input_path=${data_dir}/dataset/BSD100/LR \
         --data_truth_path=${data_dir}/dataset/BSD100/SR \
-        --restore_path=${data_dir}/result/model.ckpt-100 \
+        --restore_path=${data_dir}/result/model.ckpt-1000000 \
         --obs_dir=${obs_url} \
         --model=bsrn \
         --scales=4 \

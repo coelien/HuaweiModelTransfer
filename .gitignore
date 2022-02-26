@@ -4,3 +4,5 @@
 MA_LOG/
 results/
 *.pyc
+*.pb
+test_results/
