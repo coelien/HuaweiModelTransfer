@@ -31,6 +31,7 @@ import os
 
 import numpy as np
 import tensorflow as tf
+from scipy.ndimage import gaussian_filter
 from tensorflow.core.protobuf.rewriter_config_pb2 import RewriterConfig
 
 DEFAULT_DATALOADER = 'basic_loader'
@@ -126,11 +127,60 @@ def _image_rmse2(output_image, truth_image):
     rmse = np.sqrt(np.mean(diff ** 2))
     return rmse
 
+def _image_ssim(X, Y):
+    """
+       Computes the mean structural similarity between two images.
+    """
+    assert (X.shape == Y.shape), "Image-patche provided have different dimensions"
+    nch = 1 if X.ndim == 2 else X.shape[-1]
+    mssim = []
+    for ch in range(nch):
+        Xc, Yc = X[..., ch].astype(np.float64), Y[..., ch].astype(np.float64)
+        mssim.append(compute_ssim(Xc, Yc))
+    return np.mean(mssim)
+
+
+def compute_ssim(X, Y):
+    """
+       Compute the structural similarity per single channel (given two images)
+    """
+    # variables are initialized as suggested in the paper
+    K1 = 0.01
+    K2 = 0.03
+    sigma = 1.5
+    win_size = 5
+
+    # means
+    ux = gaussian_filter(X, sigma)
+    uy = gaussian_filter(Y, sigma)
+
+    # variances and covariances
+    uxx = gaussian_filter(X * X, sigma)
+    uyy = gaussian_filter(Y * Y, sigma)
+    uxy = gaussian_filter(X * Y, sigma)
+
+    # normalize by unbiased estimate of std dev
+    N = win_size ** X.ndim
+    unbiased_norm = N / (N - 1)  # eq. 4 of the paper
+    vx = (uxx - ux * ux) * unbiased_norm
+    vy = (uyy - uy * uy) * unbiased_norm
+    vxy = (uxy - ux * uy) * unbiased_norm
+
+    R = 255
+    C1 = (K1 * R) ** 2
+    C2 = (K2 * R) ** 2
+    # compute SSIM (eq. 13 of the paper)
+    sim = (2 * ux * uy + C1) * (2 * vxy + C2)
+    D = (ux ** 2 + uy ** 2 + C1) * (vx + vy + C2)
+    SSIM = sim / D
+    mssim = SSIM.mean()
+
+    return mssim
 
 def go():
     # initialize
     FLAGS.bsrn_intermediate_outputs = True
-    # os.environ['CUDA_VISIBLE_DEVICES'] = FLAGS.cuda_device
+    os.environ['CUDA_VISIBLE_DEVICES'] = FLAGS.cuda_device
     scale_list = list(map(lambda x: int(x), FLAGS.scales.split(',')))
     tf.logging.set_verbosity(tf.logging.INFO)
 
@@ -219,23 +269,23 @@ def go():
             # validate
             num_total_outputs = FLAGS.bsrn_recursions // FLAGS.bsrn_recursion_frequency
             modules_average_psnr_dict = {}
-            modules_average_rmse_dict = {}
+            modules_average_ssim_dict = {}
             # modules_average_ssim_dict = {}
 
             for scale in scale_list:
                 modules_average_psnr_dict[scale] = []
-                modules_average_rmse_dict[scale] = []
+                modules_average_ssim_dict[scale] = []
                 # modules_average_ssim_dict[scale] = []
 
             num_images = dataloader.get_num_images()
 
             for scale in scale_list:
                 psnr_list = []
-                rmse_list = []
+                ssim_list = []
                 # ssim_list = []
                 for i in range(num_total_outputs + 1):
                     psnr_list.append([])
-                    rmse_list.append([])
+                    ssim_list.append([])
                     # ssim_list.append([])
 
                 print(num_images)
@@ -248,12 +298,12 @@ def go():
                     output_images = np.array_split(out, 16, axis=0)
 
                     # print(output_images)
-                    print("----------------------------------------------------------")
-                    print("input type:",type(input_image),"shape: ",input_image.shape)
-                    print(type(output_images))
-                    print(len(output_images))
-                    for output_img in output_images:
-                        print(type(output_img), output_img.shape)
+                    # print("----------------------------------------------------------")
+                    # print("input type:",type(input_image),"shape: ",input_image.shape)
+                    # print(type(output_images))
+                    # print(len(output_images))
+                    # for output_img in output_images:
+                    #     print(type(output_img), output_img.shape)
                     output_image_ensemble = np.zeros_like(output_images[0][0])
                     ensemble_factor_total = 0.0
 
@@ -281,16 +331,16 @@ def go():
                             truth_image_shaved = _shave_image(truth_image, shave_size=FLAGS.shave_size)
                             output_image_shaved = _shave_image(output_image, shave_size=FLAGS.shave_size)
 
-                            psnr = _image_psnr(output_image=output_image_shaved, truth_image=truth_image_shaved)
-                            rmse = _image_rmse(output_image=output_image_shaved, truth_image=truth_image_shaved)
+                            psnr = _image_psnr2(output_image=output_image_shaved, truth_image=truth_image_shaved)
+                            ssim = _image_ssim(output_image_shaved,truth_image_shaved)
                             # ssim = _image_ssim_tf(output_image=output_image_shaved, truth_image=truth_image_shaved)
                             # print("----------------------------------------------")
                             # print("_____________________________________",ssim)
-                            tf.logging.info('t%d, x%d, %d/%d, psnr=%.2f, rmse=%.2f' % (
-                                num_recursions, scale, image_index + 1, num_images, psnr, rmse))
+                            tf.logging.info('t%d, x%d, %d/%d, psnr=%.2f, ssim=%.2f' % (
+                                num_recursions, scale, image_index + 1, num_images, psnr, ssim))
 
                             psnr_list[i].append(psnr)
-                            rmse_list[i].append(rmse)
+                            ssim_list[i].append(ssim)
                             # ssim_list[i].append(ssim)
 
                     output_image = output_image_ensemble / ensemble_factor_total
@@ -309,32 +359,32 @@ def go():
                     truth_image_shaved = _shave_image(truth_image, shave_size=FLAGS.shave_size)
                     output_image_shaved = _shave_image(output_image, shave_size=FLAGS.shave_size)
 
-                    psnr = _image_psnr(output_image=output_image_shaved, truth_image=truth_image_shaved)
-                    rmse = _image_rmse(output_image=output_image_shaved, truth_image=truth_image_shaved)
+                    psnr = _image_psnr2(output_image=output_image_shaved, truth_image=truth_image_shaved)
+                    ssim = _image_ssim(output_image_shaved, truth_image_shaved)
                     # ssim = _image_ssim_tf(output_image=output_image_shaved, truth_image=truth_image_shaved)
 
                     tf.logging.info(
-                        'ensemble, x%d, %d/%d, psnr=%.2f, rmse=%.2f' % (scale, image_index + 1, num_images, psnr, rmse))
+                        'ensemble, x%d, %d/%d, psnr=%.2f, ssim=%.2f' % (scale, image_index + 1, num_images, psnr, ssim))
 
                     psnr_list[num_total_outputs].append(psnr)
-                    rmse_list[num_total_outputs].append(rmse)
+                    ssim_list[num_total_outputs].append(ssim)
                     # ssim_list[num_total_outputs].append(ssim)
 
                 for i in range(num_total_outputs + 1):
                     average_psnr = np.mean(psnr_list[i])
                     modules_average_psnr_dict[scale].append(average_psnr)
-                    average_rmse = np.mean(rmse_list[i])
-                    modules_average_rmse_dict[scale].append(average_rmse)
+                    average_ssim = np.mean(ssim_list[i])
+                    modules_average_ssim_dict[scale].append(average_ssim)
                     # average_ssim = np.mean(ssim_list[i])
                     # modules_average_ssim_dict[scale].append(average_ssim)
 
             # finalize
             tf.logging.info('finished')
             for scale in scale_list:
-                print('- x%d, PSNR and RMSE:' % (scale))
+                print('- x%d, PSNR and SSIM:' % (scale))
                 print(','.join([('%.3f' % x) for x in modules_average_psnr_dict[scale]]))
                 print('')
-                print(','.join([('%.3f' % x) for x in modules_average_rmse_dict[scale]]))
+                print(','.join([('%.3f' % x) for x in modules_average_ssim_dict[scale]]))
                 # print('')
                 # print(','.join([('%.3f' % x) for x in modules_average_ssim_dict[scale]]))
 

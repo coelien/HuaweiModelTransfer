@@ -41,7 +41,7 @@ if FLAGS.chip == 'npu':
   from npu_bridge.npu_init import *
 
 # 与模型训练相关的参数
-tf.flags.DEFINE_string('bsrn_model_scales', '-1', 'Supported scales of the model. Use the \',\' character to specify multiple scales (e.g., 2,3,4). This parameter is involved in constructing the multi-scale structure of the model.')
+tf.flags.DEFINE_string('bsrn_model_scales', '2,3,4', 'Supported scales of the model. Use the \',\' character to specify multiple scales (e.g., 2,3,4). This parameter is involved in constructing the multi-scale structure of the model.')
 tf.flags.DEFINE_integer('bsrn_conv_features', 64, 'The number of convolutional features (\'c\' in the paper).')
 tf.flags.DEFINE_integer('bsrn_state_features', 64, 'The number of state features (\'s\' in the paper).')
 tf.flags.DEFINE_integer('bsrn_recursions', 16, 'The number of recursions of the recursive residual block (\'R\' in the paper).')

@@ -10,7 +10,7 @@ from scipy.ndimage import gaussian_filter
 FLAGS = tf.flags.FLAGS
 DEFAULT_DATALOADER = 'basic_loader'
 DEFAULT_MODEL = 'bsrn'
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 if __name__ == '__main__':
     tf.flags.DEFINE_string('dataloader', DEFAULT_DATALOADER, 'Name of the data loader.')
     tf.flags.DEFINE_string('model', DEFAULT_MODEL, 'Name of the model.')

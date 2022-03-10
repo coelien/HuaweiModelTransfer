@@ -30,6 +30,7 @@ import os
 import numpy as np
 import tensorflow as tf
 
+from npu_bridge.npu_init import *
 from dataloaders.base_loader import BaseLoader
 from tensorflow.core.protobuf.rewriter_config_pb2 import RewriterConfig
 
@@ -41,8 +42,7 @@ tf.flags.DEFINE_string('data_truth_path', 'HR',
                        'Base path of the ground-truth images. The image name should be the same as that of the input (downscaled) image.')
 tf.flags.DEFINE_bool('data_cached', False, 'If true, cache the data on the memory.')
 
-if FLAGS.chip == 'npu':
-    from npu_bridge.npu_init import *
+# if FLAGS.chip == 'npu':
 
 
 def create_loader():

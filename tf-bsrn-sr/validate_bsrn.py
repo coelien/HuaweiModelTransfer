@@ -180,178 +180,177 @@ def _image_rmse2(output_image, truth_image):
   return rmse
 
 
-def go():
-  # initialize
-  FLAGS.bsrn_intermediate_outputs = True
-  # os.environ['CUDA_VISIBLE_DEVICES'] = FLAGS.cuda_device
-  scale_list = list(map(lambda x: int(x), FLAGS.scales.split(',')))
-  tf.logging.set_verbosity(tf.logging.INFO)
+os.environ["CUDA_VISIBLE_DEVICES"] = '-1'
+# initialize
+FLAGS.bsrn_intermediate_outputs = True
+# os.environ['CUDA_VISIBLE_DEVICES'] = FLAGS.cuda_device
+scale_list = list(map(lambda x: int(x), FLAGS.scales.split(',')))
+tf.logging.set_verbosity(tf.logging.INFO)
 
-  # data loader
-  dataloader = DATALOADER_MODULE.create_loader()
-  dataloader.prepare()
+# data loader
+dataloader = DATALOADER_MODULE.create_loader()
+dataloader.prepare()
 
-  # image saving session
-  if (FLAGS.save_path is not None):
-    tf_image_save_graph = tf.Graph()
-    with tf_image_save_graph.as_default():
-      tf_image_save_path = tf.placeholder(tf.string, [])
-      tf_image_save_image = tf.placeholder(tf.float32, [None, None, 3])
-      
-      tf_image = tf_image_save_image
-      tf_image = tf.round(tf_image)
-      tf_image = tf.clip_by_value(tf_image, 0, 255)
-      tf_image = tf.cast(tf_image, tf.uint8)
-      
-      tf_image_png = tf.image.encode_png(tf_image)
-      tf_image_save_op = tf.write_file(tf_image_save_path, tf_image_png)
+# image saving session
+if (FLAGS.save_path is not None):
+  tf_image_save_graph = tf.Graph()
+  with tf_image_save_graph.as_default():
+    tf_image_save_path = tf.placeholder(tf.string, [])
+    tf_image_save_image = tf.placeholder(tf.float32, [None, None, 3])
 
-      tf_image_init = tf.global_variables_initializer()
+    tf_image = tf_image_save_image
+    tf_image = tf.round(tf_image)
+    tf_image = tf.clip_by_value(tf_image, 0, 255)
+    tf_image = tf.cast(tf_image, tf.uint8)
 
-      if FLAGS.chip == 'gpu':
-        os.environ["CUDA_VISIBLE_DEVICES"] = FLAGS.cuda_device  # set GPU:0
-        # 设置set_session,与GPU有关
-        config = tf.compat.v1.ConfigProto()
-        config.gpu_options.allow_growth = True
-        # config.gpu_options.per_process_gpu_memory_fraction = 0.3
-        # 设置GPU显存按需增长
-        config.gpu_options.allow_growth = True
-        tf_image_session = tf.compat.v1.Session(config=config)
+    tf_image_png = tf.image.encode_png(tf_image)
+    tf_image_save_op = tf.write_file(tf_image_save_path, tf_image_png)
 
-      elif FLAGS.chip == 'npu':
+    tf_image_init = tf.global_variables_initializer()
+    # config = tf.ConfigProto()
+    # tf_image_session = tf.Session(config=config)
+    # tf_image_session.run(tf_image_init)
+    if FLAGS.chip == 'gpu':
+      os.environ["CUDA_VISIBLE_DEVICES"] = '-1'#FLAGS.cuda_device  # set GPU:0
+      # 设置set_session,与GPU有关
+      print('set cpu')
+      config = tf.compat.v1.ConfigProto()
+      config.gpu_options.allow_growth = True
+      # config.gpu_options.per_process_gpu_memory_fraction = 0.3
+      # 设置GPU显存按需增长
+      config.gpu_options.allow_growth = True
+      tf_image_session = tf.compat.v1.Session(config=config)
 
-        # os.environ['ASCEND_SLOG_PRINT_TO_STDOUT'] = "1"
-        sess_config = tf.compat.v1.ConfigProto()
-        custom_op = sess_config.graph_options.rewrite_options.custom_optimizers.add()
-        custom_op.name = "NpuOptimizer"
-        # 设置自动调优
-        # custom_op.parameter_map["auto_tune_mode"].s = tf.compat.as_bytes("RL,GA")
-        # if FLAGS.profiling:
-        #   custom_op.parameter_map["profiling_mode"].b = True
-        #   custom_op.parameter_map["profiling_options"].s = tf.compat.as_bytes(
-        #     '{"output":"/home/HwHiAiUser/output","task_trace":"on"}')
-        sess_config.graph_options.rewrite_options.remapping = RewriterConfig.OFF
-        sess_config.graph_options.rewrite_options.memory_optimization = RewriterConfig.OFF
-        custom_op.parameter_map["dynamic_input"].b = True
-        custom_op.parameter_map["dynamic_graph_execute_mode"].s = tf.compat.as_bytes("lazy_recompile")
-        tf_image_session = tf.compat.v1.Session(config=sess_config)
-      else:
-        config = tf.compat.v1.ConfigProto()
-        tf_image_session = tf.Session(config=config)
+    elif FLAGS.chip == 'npu':
 
-      tf_image_session.run(tf_image_init)
+      # os.environ['ASCEND_SLOG_PRINT_TO_STDOUT'] = "1"
+      sess_config = tf.compat.v1.ConfigProto()
+      custom_op = sess_config.graph_options.rewrite_options.custom_optimizers.add()
+      custom_op.name = "NpuOptimizer"
+      # 设置自动调优
+      # custom_op.parameter_map["auto_tune_mode"].s = tf.compat.as_bytes("RL,GA")
+      # if FLAGS.profiling:
+      #   custom_op.parameter_map["profiling_mode"].b = True
+      #   custom_op.parameter_map["profiling_options"].s = tf.compat.as_bytes(
+      #     '{"output":"/home/HwHiAiUser/output","task_trace":"on"}')
+      sess_config.graph_options.rewrite_options.remapping = RewriterConfig.OFF
+      sess_config.graph_options.rewrite_options.memory_optimization = RewriterConfig.OFF
+      custom_op.parameter_map["dynamic_input"].b = True
+      custom_op.parameter_map["dynamic_graph_execute_mode"].s = tf.compat.as_bytes("lazy_recompile")
+      tf_image_session = tf.compat.v1.Session(config=sess_config)
+    else:
+      config = tf.compat.v1.ConfigProto()
+      tf_image_session = tf.Session(config=config)
 
-  # model
-  model = MODEL_MODULE.create_model()
-  model.prepare(is_training=False, global_step=FLAGS.restore_global_step)
+    tf_image_session.run(tf_image_init)
 
-  # model > restore
-  model.restore(ckpt_path=FLAGS.restore_path, target=FLAGS.restore_target)
-  tf.logging.info('restored the model')
+# model
+model = MODEL_MODULE.create_model()
+model.prepare(is_training=False, global_step=FLAGS.restore_global_step)
 
-  # validate
-  num_total_outputs = FLAGS.bsrn_recursions // FLAGS.bsrn_recursion_frequency
-  modules_average_psnr_dict = {}
-  modules_average_ssim_dict = {}
+# model > restore
+model.restore(ckpt_path=FLAGS.restore_path, target=FLAGS.restore_target)
+tf.logging.info('restored the model')
 
-  for scale in scale_list:
-    modules_average_psnr_dict[scale] = []
-    modules_average_ssim_dict[scale] = []
+# validate
+num_total_outputs = FLAGS.bsrn_recursions // FLAGS.bsrn_recursion_frequency
+modules_average_psnr_dict = {}
+modules_average_ssim_dict = {}
 
-  num_images = dataloader.get_num_images()
+for scale in scale_list:
+  modules_average_psnr_dict[scale] = []
+  modules_average_ssim_dict[scale] = []
 
-  for scale in scale_list:
-    psnr_list = []
-    ssim_list = []
-    for i in range(num_total_outputs+1):
-      psnr_list.append([])
-      ssim_list.append([])
+num_images = dataloader.get_num_images()
 
-    for image_index in range(num_images):
-      input_image, truth_image, image_name = dataloader.get_image_pair(image_index=image_index, scale=scale)
+for scale in scale_list:
+  psnr_list = []
+  ssim_list = []
+  for i in range(num_total_outputs+1):
+    psnr_list.append([])
+    ssim_list.append([])
 
-      # why ?
-      if (image_index == 0):
-        _ = model.upscale(input_list=[input_image], scale=scale)
+  for image_index in range(num_images):
+    input_image, truth_image, image_name = dataloader.get_image_pair(image_index=image_index, scale=scale)
+    print('processing image:',image_index)
+    # why ?
+    if (image_index == 0):
+      _ = model.upscale(input_list=[input_image], scale=scale)
 
-      output_images = model.upscale(input_list=[input_image], scale=scale)
-      # print(output_images)
-      output_image_ensemble = np.zeros_like(output_images[0][0])
-      ensemble_factor_total = 0.0
-      
-      for i in range(num_total_outputs):
-        num_recursions = (i + 1) * FLAGS.bsrn_recursion_frequency
+    output_images = model.upscale(input_list=[input_image], scale=scale)
+    # print(output_images)
+    output_image_ensemble = np.zeros_like(output_images[0][0])
+    ensemble_factor_total = 0.0
 
-        output_image = output_images[i][0]
+    for i in range(num_total_outputs):
+      num_recursions = (i + 1) * FLAGS.bsrn_recursion_frequency
 
-        ensemble_factor = 1.0 / (2.0 ** (num_total_outputs-num_recursions))
-        output_image_ensemble = output_image_ensemble + (output_image * ensemble_factor)
-        ensemble_factor_total += ensemble_factor
+      output_image = output_images[i][0]
 
-        if (not FLAGS.ensemble_only):
-          if (FLAGS.save_path is not None):
-            output_image_path = os.path.join(FLAGS.save_path, 't%d' % (num_recursions), 'x%d' % (scale), os.path.splitext(image_name)[0]+'.png')
-            tf_image_session.run(tf_image_save_op, feed_dict={tf_image_save_path:output_image_path, tf_image_save_image:output_image})
+      ensemble_factor = 1.0 / (2.0 ** (num_total_outputs-num_recursions))
+      output_image_ensemble = output_image_ensemble + (output_image * ensemble_factor)
+      ensemble_factor_total += ensemble_factor
 
-          truth_image = _clip_image(truth_image)
-          output_image = _clip_image(output_image)
+      if (not FLAGS.ensemble_only):
+        if (FLAGS.save_path is not None):
+          output_image_path = os.path.join(FLAGS.save_path, 't%d' % (num_recursions), 'x%d' % (scale), os.path.splitext(image_name)[0]+'.png')
+          tf_image_session.run(tf_image_save_op, feed_dict={tf_image_save_path:output_image_path, tf_image_save_image:output_image})
 
-          truth_image = _fit_truth_image_size(output_image=output_image, truth_image=truth_image)
+        truth_image = _clip_image(truth_image)
+        output_image = _clip_image(output_image)
 
-          truth_image_shaved = _shave_image(truth_image, shave_size=FLAGS.shave_size)
-          output_image_shaved = _shave_image(output_image, shave_size=FLAGS.shave_size)
+        truth_image = _fit_truth_image_size(output_image=output_image, truth_image=truth_image)
 
-          psnr = _image_psnr2(output_image=output_image_shaved, truth_image=truth_image_shaved)
-          # ssim = _image_rmse(im1=output_image_shaved, im2=truth_image_shaved)
-          ssim = _image_rmse(output_image=output_image_shaved, truth_image=truth_image_shaved)
+        truth_image_shaved = _shave_image(truth_image, shave_size=FLAGS.shave_size)
+        output_image_shaved = _shave_image(output_image, shave_size=FLAGS.shave_size)
 
-          tf.logging.info('t%d, x%d, %d/%d, psnr=%.2f, ssim=%.2f' % (num_recursions, scale, image_index+1, num_images, psnr, ssim))
+        psnr = _image_psnr2(output_image=output_image_shaved, truth_image=truth_image_shaved)
+        # ssim = _image_rmse(im1=output_image_shaved, im2=truth_image_shaved)
+        ssim = _image_rmse(output_image=output_image_shaved, truth_image=truth_image_shaved)
 
-          psnr_list[i].append(psnr)
-          ssim_list[i].append(ssim)
-      
-      output_image = output_image_ensemble / ensemble_factor_total
+        tf.logging.info('t%d, x%d, %d/%d, psnr=%.2f, ssim=%.2f' % (num_recursions, scale, image_index+1, num_images, psnr, ssim))
 
-      if (FLAGS.save_path is not None):
-        output_image_path = os.path.join(FLAGS.save_path, 'ensemble', 'x%d' % (scale), os.path.splitext(image_name)[0]+'.png')
-        tf_image_session.run(tf_image_save_op, feed_dict={tf_image_save_path:output_image_path, tf_image_save_image:output_image})
+        psnr_list[i].append(psnr)
+        ssim_list[i].append(ssim)
 
-      truth_image = _clip_image(truth_image)
-      output_image = _clip_image(output_image)
+    output_image = output_image_ensemble / ensemble_factor_total
 
-      truth_image = _fit_truth_image_size(output_image=output_image, truth_image=truth_image)
+    if (FLAGS.save_path is not None):
+      output_image_path = os.path.join(FLAGS.save_path, 'ensemble', 'x%d' % (scale), os.path.splitext(image_name)[0]+'.png')
+      tf_image_session.run(tf_image_save_op, feed_dict={tf_image_save_path:output_image_path, tf_image_save_image:output_image})
 
-      truth_image_shaved = _shave_image(truth_image, shave_size=FLAGS.shave_size)
-      output_image_shaved = _shave_image(output_image, shave_size=FLAGS.shave_size)
+    truth_image = _clip_image(truth_image)
+    output_image = _clip_image(output_image)
 
-      psnr = _image_psnr2(output_image=output_image_shaved, truth_image=truth_image_shaved)
-      # ssim = _image_rmse(im1=output_image_shaved, im2=truth_image_shaved)
-      ssim = _image_rmse(output_image=output_image_shaved, truth_image=truth_image_shaved)
+    truth_image = _fit_truth_image_size(output_image=output_image, truth_image=truth_image)
 
-      tf.logging.info('ensemble, x%d, %d/%d, psnr=%.2f, ssim=%.2f' % (scale, image_index+1, num_images, psnr, ssim))
+    truth_image_shaved = _shave_image(truth_image, shave_size=FLAGS.shave_size)
+    output_image_shaved = _shave_image(output_image, shave_size=FLAGS.shave_size)
 
-      psnr_list[num_total_outputs].append(psnr)
-      ssim_list[num_total_outputs].append(ssim)
+    psnr = _image_psnr2(output_image=output_image_shaved, truth_image=truth_image_shaved)
+    # ssim = _image_rmse(im1=output_image_shaved, im2=truth_image_shaved)
+    ssim = _image_rmse(output_image=output_image_shaved, truth_image=truth_image_shaved)
 
-    for i in range(num_total_outputs+1):
-      average_psnr = np.mean(psnr_list[i])
-      modules_average_psnr_dict[scale].append(average_psnr)
-      average_ssim = np.mean(ssim_list[i])
-      modules_average_ssim_dict[scale].append(average_ssim)
+    tf.logging.info('ensemble, x%d, %d/%d, psnr=%.2f, ssim=%.2f' % (scale, image_index+1, num_images, psnr, ssim))
 
+    psnr_list[num_total_outputs].append(psnr)
+    ssim_list[num_total_outputs].append(ssim)
 
-  # finalize
-  tf.logging.info('finished')
-  for scale in scale_list:
-    print('- x%d, PSNR and SSIM:' % (scale))
-    print(','.join([('%.3f' % x) for x in modules_average_psnr_dict[scale]]))
-    print('')
-    print(','.join([('%.3f' % x) for x in modules_average_ssim_dict[scale]]))
-
-  if FLAGS.platform.lower() == 'modelarts':
-    from help_modelarts import modelarts_result2obs
-    modelarts_result2obs(FLAGS)
+  for i in range(num_total_outputs+1):
+    average_psnr = np.mean(psnr_list[i])
+    modules_average_psnr_dict[scale].append(average_psnr)
+    average_ssim = np.mean(ssim_list[i])
+    modules_average_ssim_dict[scale].append(average_ssim)
 
 
-if __name__ == '__main__':
-  tf.compat.v1.app.run(go())
+# finalize
+tf.logging.info('finished')
+for scale in scale_list:
+  print('- x%d, PSNR and SSIM:' % (scale))
+  print(','.join([('%.3f' % x) for x in modules_average_psnr_dict[scale]]))
+  print('')
+  print(','.join([('%.3f' % x) for x in modules_average_ssim_dict[scale]]))
+
+if FLAGS.platform.lower() == 'modelarts':
+  from help_modelarts import modelarts_result2obs
+  modelarts_result2obs(FLAGS)
